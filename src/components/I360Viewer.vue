@@ -270,7 +270,7 @@ export default {
                     console.error(`Something went wrong while loading images: ${error.message}`);
                 }
             } else {
-                console.log('No Images Found')
+                console.error('No Images Found')
             }
         },
         addImage(resultSrc){
@@ -291,22 +291,10 @@ export default {
 
             if (this.loadedImages === this.amount) {
                 this.onAllImagesLoaded(event);
-            } else if (this.loadedImages === 1) {
-                //this.onFirstImageLoaded(event);
-                console.log('load first image')
             }
         },
         updatePercentageInLoader(percentage) {
-            /* if (this.loader) {
-                this.loader.style.width = percentage + '%';
-            }
-
-            if (this.view360Icon) {
-                this.view360Icon.innerText = percentage + '%';
-            } */
-
             this.$refs.viewPercentage.innerHTML = percentage + '%';
-            //console.log(percentage + '%')
         },
         onAllImagesLoaded(e){
             this.imagesLoaded = true
@@ -358,7 +346,6 @@ export default {
             this.moveActiveIndexUp(1);
         },
         loadImages(){
-            console.log('load image')
         },
         checkMobile(){
             this.isMobile = !!('ontouchstart' in window || navigator.msMaxTouchPoints);
@@ -371,7 +358,6 @@ export default {
             this.setImage()
         },
         onPinch(evt){
-            console.log('on tap')
         },
         onPinchEnd(evt){
             this.tempScale = 0
@@ -470,10 +456,6 @@ export default {
 
                     this.redraw()
                 }
-
-                this.currentCanvasImage.onerror = () => {
-                    console.log('cannot load this image')
-                }
             }else{
                 this.currentCanvasImage = this.images[0]
                 let viewportElement = this.$refs.viewport.getBoundingClientRect()
@@ -550,18 +532,11 @@ export default {
 
                 imgElement.addEventListener('click', (e) => {
                     e.preventDefault()
-                    console.log('show edit hotspot form')
                     this.selectedHotspot = hotspotElement
                     this.openHotspotForm(true)
                 })
-
-                if(hotspotElement.action){
-                    console.log('add this function: ' + hotspotElement.action)
-                }
                 
                 this.$refs.viewport.appendChild(divElement)
-                //console.log('draw')
-                //this.ctx.drawImage(this.currentCanvasImage, hotspotElement.x*this.canvas.width, hotspotElement.y*this.canvas.height, 10, 10)
             }
         },
         clearHotspots(){
@@ -707,9 +682,7 @@ export default {
             return scale;
         },
         zoom(clicks){
-            //console.log(this.lastX + ' - ' + this.lastY)
             let factor = Math.pow(1.01,clicks);
-            //console.log(factor)
 
             if(factor > 1){
                 this.currentScale += factor
@@ -724,7 +697,6 @@ export default {
                 let pt = this.ctx.transformedPoint(this.lastX,this.lastY);
                 this.ctx.translate(pt.x,pt.y);
                 
-                //console.log(this.currentScale)
                 this.ctx.scale(factor,factor);
                 this.ctx.translate(-pt.x,-pt.y);
                 this.redraw();
