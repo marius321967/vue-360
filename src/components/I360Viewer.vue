@@ -159,14 +159,14 @@ export default {
             dragStart: null,
             lastX: 0,
             lastY: 0,
-            currentCanvasImage: null,
+            currentCanvasImage: null, // HTMLImageElement
             isFullScreen: false,
             viewPortElementWidth: null,
             movementStart: 0,
             movement: false,
             dragSpeed: 150,
             speedFactor: 13,
-            activeImage: 1,
+            activeImageIndex: 1,
             stopAtEdges: false,
             imagesLoaded: false,
             loadedImages: 0,
@@ -176,8 +176,8 @@ export default {
             isMobile: false,
             currentLoop: 0,
             loopTimeoutId: 0,
-            images: [],
-            imageData: [],
+            images: [], // HTMLImageElement[]
+            imageUrls: [], string[]
             playing: false
         }
     },
@@ -199,14 +199,10 @@ export default {
                 //exit full screen
                 this.$refs.viewerContainer.classList.remove('v360-main')
                 this.$refs.viewerContainer.classList.remove('v360-fullscreen')
-                /* this.$refs.enterFullScreenIcon.style.display = 'block'
-                this.$refs.leaveFullScreenIcon.style.display = 'none' */
             }else{
                 //enter full screen
                 this.$refs.viewerContainer.classList.add('v360-main')
                 this.$refs.viewerContainer.classList.add('v360-fullscreen')
-                /* this.$refs.enterFullScreenIcon.style.display = 'none'
-                this.$refs.leaveFullScreenIcon.style.display = 'block' */
                 
             }
             this.setImage()
@@ -246,7 +242,7 @@ export default {
                 const imageIndex = (this.paddingIndex) ? this.lpad(i, "0", 2) : i
                 const fileName = this.fileName.replace('{index}', imageIndex);
                 const filePath = `${this.imagePath}/${fileName}`
-                this.imageData.push(filePath)
+                this.imageUrls.push(filePath)
             }
 
             this.preloadImages()
@@ -260,10 +256,10 @@ export default {
         },
 
         preloadImages(){
-            if (this.imageData.length) {
+            if (this.imageUrls.length) {
                 try {
-                    this.amount = this.imageData.length;
-                    this.imageData.forEach(src => {
+                    this.amount = this.imageUrls.length;
+                    this.imageUrls.forEach(src => {
                         this.addImage(src);
                     });
                 } catch (error) {
@@ -312,14 +308,14 @@ export default {
             }
         },
         stop() {
-            if(this.activeImage == 1){
+            if(this.activeImageIndex == 1){
                 this.currentLoop = 0
             }
             this.playing = false;
             window.clearTimeout(this.loopTimeoutId);
         },
         loopImages() {
-            if(this.activeImage == 1){
+            if(this.activeImageIndex == 1){
                 if(this.currentLoop == this.loop){
                     this.stop()
                 }
@@ -351,7 +347,7 @@ export default {
             this.isMobile = !!('ontouchstart' in window || navigator.msMaxTouchPoints);
         },
         loadInitialImage(){
-            this.currentImage = this.imageData[0] 
+            this.currentImage = this.imageUrls[0] 
             this.setImage()
         },
         resizeWindow(){
@@ -437,7 +433,7 @@ export default {
         },
         resetPosition(){
             this.currentScale = 1
-            this.activeImage = 1
+            this.activeImageIndex = 1
             this.setImage(true)
         },
         setImage(cached = false){
@@ -499,7 +495,7 @@ export default {
         addHotspots(){
             this.clearHotspots()
 
-            let currentImageHotspots = this.hotspots.filter(h => h.frame == this.activeImage)
+            let currentImageHotspots = this.hotspots.filter(h => h.frame == this.activeImageIndex)
 
             for(let c in currentImageHotspots){
                 let hotspotElement = currentImageHotspots[c]
@@ -587,13 +583,13 @@ export default {
         moveActiveIndexUp(itemsSkipped) {
 
             if (this.stopAtEdges) {
-                if (this.activeImage + itemsSkipped >= this.amount) {
-                    this.activeImage = this.amount;
+                if (this.activeImageIndex + itemsSkipped >= this.amount) {
+                    this.activeImageIndex = this.amount;
                 } else {
-                    this.activeImage += itemsSkipped;
+                    this.activeImageIndex += itemsSkipped;
                 }
             } else {
-                this.activeImage = (this.activeImage + itemsSkipped) % this.amount || this.amount;
+                this.activeImageIndex = (this.activeImageIndex + itemsSkipped) % this.amount || this.amount;
             }
             
             this.update()
@@ -601,23 +597,23 @@ export default {
         moveActiveIndexDown(itemsSkipped) {
 
             if (this.stopAtEdges) {
-                if (this.activeImage - itemsSkipped <= 1) {
-                    this.activeImage = 1;
+                if (this.activeImageIndex - itemsSkipped <= 1) {
+                    this.activeImageIndex = 1;
                 } else {
-                    this.activeImage -= itemsSkipped;
+                    this.activeImageIndex -= itemsSkipped;
                 }
             } else {
-                if (this.activeImage - itemsSkipped < 1) {
-                    this.activeImage = this.amount + (this.activeImage - itemsSkipped);
+                if (this.activeImageIndex - itemsSkipped < 1) {
+                    this.activeImageIndex = this.amount + (this.activeImageIndex - itemsSkipped);
                 } else {
-                    this.activeImage -= itemsSkipped;
+                    this.activeImageIndex -= itemsSkipped;
                 }
             }
             
             this.update()
         },
         update() {
-            const image = this.images[this.activeImage - 1];
+            const image = this.images[this.activeImageIndex - 1];
 
             this.currentCanvasImage = image
 
