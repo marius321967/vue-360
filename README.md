@@ -1,24 +1,5 @@
 # vue-360
-- A Simple and Beautiful 360&deg; Product Viewer built on Vue.js
-
-## Demo
-
-![Preview](https://www.techsolate.com/vue-360-viewer/demo.gif)
-
-[Click Here for Demo](http://rajeevgade.github.io/portfolio/vue-360-viewer)
-
-## Features
-
-- 360&deg; View
-- Zoom
-- Pan
-- Autoplay (Loops)
-- Full Screen Mode
-- Spin Direction
-- Image Caching
-- Mobile Responsive
-- Touch Events
-
+Fork of [rajeevgade/vue-360](https://github.com/rajeevgade/vue-360) with modifications.
 
 ## Installation
 ```
@@ -53,12 +34,6 @@ Vue.use(VueThreeSixty)
 </template>
 ```
 
-### Icons
-- The icons used in the demo are from fontawesome. Add the following in your header to display the icons.
-```
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" rel="stylesheet" type="text/css">
-```
-
 ## Props
 
 | Name | Type | Description | Required | Default Value |
@@ -85,14 +60,8 @@ Vue.use(VueThreeSixty)
 - Move Right
 - Reset Position
 
-
-## Roadmap
-
-- Hotspots
-- Lazyloading
-- Custom CSS Classes
-- Custom Buttons
-- And a few more ...
+## Development
+The project is build by running `bili` ([read more on Bili](https://bili.egoist.sh/#/)).
 
 ## Credits
 

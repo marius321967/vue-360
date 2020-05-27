@@ -86,61 +86,77 @@ const uuidv1 = require('uuid/v1');
 export default {
     name: 'I360Viewer',
     props: {
+        /**
+         * URL to directory with all images.
+         */
         imagePath: {
             type: String,
-            require: true,
-            default: ''
+            required: false
         },
+        /**
+         * Image filename template containing {index}
+         */
         fileName: {
             type: String,
-            require: true,
-            default: ''
+            required: false
+        },
+        /**
+         * Whether to apply two-char padding with 0s.
+         */
+        padFileName: {
+            type: Boolean,
+            required: false,
+            default: false
+        },
+        /**
+         * Number of images for a complete rotation.
+         */
+        amount: {
+            type: Number,
+            required: true
+        },
+        /**
+         * Use for multi-layer renders.
+         * Array of objects containing same image properties (imagePath, fileName, padFileName).
+         */
+        layers: {
+            type: Array,
+            required: false
         },
         spinReverse: {
             type: Boolean,
-            require: true,
-            default: false,
-        },
-        amount: {
-            type: Number,
-            require: true,
-            default: 24,
+            required: true
         },
         autoplay: {
             type: Boolean,
-            require: false,
+            required: false,
             default: false
         },
         loop: {
             type: Number,
-            require: false,
+            required: false,
             default: 1
         },
         boxShadow: {
             type: Boolean,
-            require: false,
+            required: false,
             default: false
         },
         buttonClass: {
             type: String,
-            require: false,
+            required: false,
             default: 'light'
         },
         hotspots: {
             type: Array,
-            require: true,
+            required: false,
             default: () => []
         },
         identifier: {
             type: String,
-            require: true,
+            required: false,
             default: () => uuidv1()
         },
-        paddingIndex: {
-            type: Boolean,
-            require: false,
-            default: false
-        }
     },
     data(){
         return {
@@ -152,7 +168,8 @@ export default {
             currentTopPosition: 0,
             currentLeftPosition: 0,
             selectMenuOption: 1,
-            currentImage: null,
+            currentImageIndex: null, // Number
+            currentImageUrl: null, // String
             dragging: false,
             canvas: null,
             ctx: null,
@@ -176,8 +193,8 @@ export default {
             isMobile: false,
             currentLoop: 0,
             loopTimeoutId: 0,
-            images: [], // HTMLImageElement[]
-            imageUrls: [], string[]
+            images: [], // HTMLImageElement[][] - images for each layer.
+            imageUrls: [], // string[][] - URLs for each layer.
             playing: false
         }
     },
@@ -215,16 +232,34 @@ export default {
             }
         }
     },
-    mounted(){
-        //this.toggleFullScreen()
-        this.fetchData()
+    mounted() {
+        if (!this.layers && !this.imagePath && !this.fileName && !this.padFileName) 
+            console.error('layers or imagePath/fileName/padFileName properties are required.');
+
+        // Normalize given properties.
+        if (!this.layers) {
+            this.layers = [  
+                {
+                    imagePath: this.imagePath,
+                    fileName: this.fileName,
+                    padFileName: this.padFileName
+                }
+            ];
+        }
+
+        this.layers.forEach(layer => {
+            this.fetchImages(layer);
+        });
         document.addEventListener('fullscreenchange', this.exitHandler);
         document.addEventListener('webkitfullscreenchange', this.exitHandler);
         document.addEventListener('mozfullscreenchange', this.exitHandler);
         document.addEventListener('MSFullscreenChange', this.exitHandler);
     },
     methods: {
-        initData(){
+        /**
+         * Initiate the 360 viewer.
+         */
+        initData() {
             this.checkMobile()
             this.loadInitialImage()
             
@@ -236,16 +271,22 @@ export default {
 
             this.playing = this.autoplay
         },
-        fetchData(){
 
-            for(let i=1; i <= this.amount; i++){
-                const imageIndex = (this.paddingIndex) ? this.lpad(i, "0", 2) : i
-                const fileName = this.fileName.replace('{index}', imageIndex);
-                const filePath = `${this.imagePath}/${fileName}`
-                this.imageUrls.push(filePath)
+        /**
+         * Build and preload the list of images.
+         * Must be called only once during lifecycle.
+         * @param {Object} layer
+         */
+        fetchImages(layer) {
+            const layerIndex = this.imageUrls.push([]) - 1;
+            for (let i = 1; i <= this.amount; i++) {
+                const imageIndex = (layer.padFileName) ? this.lpad(i, "0", 2) : i
+                const fileName = layer.fileName.replace('{index}', imageIndex);
+                const filePath = `${layer.imagePath}/${fileName}`
+                this.imageUrls[layerIndex].push(filePath)
             }
-
-            this.preloadImages()
+            
+            this.preloadImages(layerIndex);
         },
 
         lpad(str, padString, length) {
@@ -255,29 +296,35 @@ export default {
             return str
         },
 
-        preloadImages(){
-            if (this.imageUrls.length) {
-                try {
-                    this.amount = this.imageUrls.length;
-                    this.imageUrls.forEach(src => {
-                        this.addImage(src);
-                    });
-                } catch (error) {
-                    console.error(`Something went wrong while loading images: ${error.message}`);
-                }
-            } else {
-                console.error('No Images Found')
+        /**
+         * Download all images into this.images from this.imageUrls array.
+         * @param {Number} layerIndex Index of this.imageUrls to use.
+         */
+        preloadImages(layerIndex) {
+            try {
+                this.amount = this.imageUrls.length;
+                this.imageUrls[layerIndex].forEach(src => {
+                    this.addImage(src, layerIndex);
+                });
+            } catch (error) {
+                console.error(`Something went wrong while loading images: ${error.message}`);
             }
         },
-        addImage(resultSrc){
-            const image = new Image();
 
-            image.src = resultSrc;
-            //image.crossOrigin='anonymous'
+        /**
+         * Load an Image from the network to the local list (images array).
+         * @param {String} src Image URL.
+         * @param {Number} layerIndex Layer to push the image.
+         */
+        addImage(src, layerIndex) {
+            if (!this.images[layerIndex])
+                this.images.push([]);
+
+            const image = new Image();
+            image.src = src;
             image.onload = this.onImageLoad.bind(this);
             image.onerror = this.onImageLoad.bind(this);
-
-            this.images.push(image);
+            this.images[layerIndex].push(image);
         },
         onImageLoad(event) {
             const percentage = Math.round(this.loadedImages / this.amount * 100);
@@ -292,14 +339,14 @@ export default {
         updatePercentageInLoader(percentage) {
             this.$refs.viewPercentage.innerHTML = percentage + '%';
         },
-        onAllImagesLoaded(e){
+        onAllImagesLoaded(e) {
             this.imagesLoaded = true
             this.initData()
         },
-        togglePlay(){
+        togglePlay() {
             this.playing = !this.playing
         },
-        play(){
+        play() {
             this.loopTimeoutId = window.setInterval(() => this.loopImages(), 100);
         },
         onSpin() {
@@ -347,7 +394,7 @@ export default {
             this.isMobile = !!('ontouchstart' in window || navigator.msMaxTouchPoints);
         },
         loadInitialImage(){
-            this.currentImage = this.imageUrls[0] 
+            this.currentImageUrl = this.imageUrls[0] 
             this.setImage()
         },
         resizeWindow(){
@@ -439,10 +486,10 @@ export default {
         setImage(cached = false){
             this.currentLeftPosition = this.currentTopPosition = 0
             
-            if(!cached){
+            if (!cached) {
                 this.currentCanvasImage = new Image()
                 this.currentCanvasImage.crossOrigin='anonymous'
-                this.currentCanvasImage.src = this.currentImage
+                this.currentCanvasImage.src = this.currentImageUrl
 
                 this.currentCanvasImage.onload = () => {
                     let viewportElement = this.$refs.viewport.getBoundingClientRect()
@@ -452,7 +499,7 @@ export default {
 
                     this.redraw()
                 }
-            }else{
+            } else {
                 this.currentCanvasImage = this.images[0]
                 let viewportElement = this.$refs.viewport.getBoundingClientRect()
                 this.canvas.width  = (this.isFullScreen) ? viewportElement.width : this.currentCanvasImage.width
@@ -461,12 +508,9 @@ export default {
 
                 this.redraw()
             }
-            
         },
-        redraw(){
-
+        redraw() {
             try {
-
                 let p1 = this.ctx.transformedPoint(0,0);
                 let p2 = this.ctx.transformedPoint(this.canvas.width,this.canvas.height)
 

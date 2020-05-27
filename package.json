@@ -1,13 +1,17 @@
 {
   "name": "@marius321967/vue-360",
-  "version": "2.0.0",
-  "author": {
-    "name": "Rajeev R. Gade",
-    "email": "rajeevgade@gmail.com"
-  },
+  "version": "2.0.5",
+  "contributors": [
+    {
+      "name": "Rajeev R. Gade",
+      "email": "rajeevgade@gmail.com"
+    },
+    {
+      "name": "marius321967"
+    }
+  ],
   "description": "A Simple and Beautiful 360 viewer for your product",
-  "repository": "rajeevgade/vue-360",
-  "homepage": "https://rajeevgade.github.io/portfolio/vue-360-viewer/",
+  "repository": "marius321967/vue-360",
   "license": "MIT",
   "main": "./dist/index.js",
   "private": false,
@@ -34,7 +38,7 @@
     "bili": "^4.8.1",
     "eslint": "^5.16.0",
     "eslint-plugin-vue": "^5.0.0",
-    "rollup-plugin-vue": "^5.1.5",
+    "rollup-plugin-vue": "^5.1.9",
     "vue-template-compiler": "^2.6.10"
   },
   "eslintConfig": {
