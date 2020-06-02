@@ -10,7 +10,9 @@
             <!-- Percentage Loader -->
             <div class="v360-viewport" v-if="!imagesLoaded">
                 <div class="v360-spinner-grow"></div>
-                <p ref="viewPercentage" class="v360-percentage-text"></p>
+                <p class="v360-percentage-text">
+                    {{ loadProgress }}
+                </p>
             </div>
             <!--/ Percentage Loader -->
 
@@ -101,12 +103,11 @@ export default {
             required: false
         },
         /**
-         * Whether to apply two-char padding with 0s.
+         * Zero-padding amount.
          */
-        padFileName: {
-            type: Boolean,
-            required: false,
-            default: false
+        fileNamePadding: {
+            type: Number,
+            required: false
         },
         /**
          * Number of images for a complete rotation.
@@ -117,7 +118,7 @@ export default {
         },
         /**
          * Use for multi-layer renders.
-         * Array of objects containing same image properties (imagePath, fileName, padFileName).
+         * Array of objects containing same image properties (imagePath, fileName).
          */
         layers: {
             type: Array,
@@ -125,7 +126,8 @@ export default {
         },
         spinReverse: {
             type: Boolean,
-            required: true
+            required: false,
+            default: false
         },
         autoplay: {
             type: Boolean,
@@ -158,7 +160,7 @@ export default {
             default: () => uuidv1()
         },
     },
-    data(){
+    data() {
         return {
             minScale: 0.5,
             maxScale: 4,
@@ -168,15 +170,12 @@ export default {
             currentTopPosition: 0,
             currentLeftPosition: 0,
             selectMenuOption: 1,
-            currentImageIndex: null, // Number
-            currentImageUrl: null, // String
             dragging: false,
             canvas: null,
             ctx: null,
             dragStart: null,
             lastX: 0,
             lastY: 0,
-            currentCanvasImage: null, // HTMLImageElement
             isFullScreen: false,
             viewPortElementWidth: null,
             movementStart: 0,
@@ -195,7 +194,8 @@ export default {
             loopTimeoutId: 0,
             images: [], // HTMLImageElement[][] - images for each layer.
             imageUrls: [], // string[][] - URLs for each layer.
-            playing: false
+            renderLayers: this.layers,
+            playing: false,
         }
     },
     watch: {
@@ -224,30 +224,30 @@ export default {
             }
             this.setImage()
         },
-        playing(value){
-            if(value){
+        playing(value) {
+            if (value) {
                 this.play()
-            }else{
+            } else {
                 this.stop()
             }
         }
     },
     mounted() {
-        if (!this.layers && !this.imagePath && !this.fileName && !this.padFileName) 
-            console.error('layers or imagePath/fileName/padFileName properties are required.');
+        if (!this.layers && !this.imagePath) 
+            console.error('layers or imagePath/fileName properties are required.');
 
         // Normalize given properties.
-        if (!this.layers) {
-            this.layers = [  
+        if (!this.renderLayers) {
+            this.renderLayers = [  
                 {
                     imagePath: this.imagePath,
                     fileName: this.fileName,
-                    padFileName: this.padFileName
+                    fileNamePadding: this.fileNamePadding,
                 }
             ];
         }
 
-        this.layers.forEach(layer => {
+        this.renderLayers.forEach(layer => {
             this.fetchImages(layer);
         });
         document.addEventListener('fullscreenchange', this.exitHandler);
@@ -261,13 +261,13 @@ export default {
          */
         initData() {
             this.checkMobile()
-            this.loadInitialImage()
-            
             this.canvas = this.$refs.imageContainer
             this.ctx = this.canvas.getContext('2d')
+
             this.attachEvents();
             window.addEventListener('resize', this.resizeWindow);
             this.resizeWindow()
+            this.loadInitialImage()
 
             this.playing = this.autoplay
         },
@@ -280,7 +280,7 @@ export default {
         fetchImages(layer) {
             const layerIndex = this.imageUrls.push([]) - 1;
             for (let i = 1; i <= this.amount; i++) {
-                const imageIndex = (layer.padFileName) ? this.lpad(i, "0", 2) : i
+                const imageIndex = (layer.fileNamePadding) ? this.lpad(i, "0", layer.fileNamePadding) : i
                 const fileName = layer.fileName.replace('{index}', imageIndex);
                 const filePath = `${layer.imagePath}/${fileName}`
                 this.imageUrls[layerIndex].push(filePath)
@@ -302,7 +302,6 @@ export default {
          */
         preloadImages(layerIndex) {
             try {
-                this.amount = this.imageUrls.length;
                 this.imageUrls[layerIndex].forEach(src => {
                     this.addImage(src, layerIndex);
                 });
@@ -327,17 +326,11 @@ export default {
             this.images[layerIndex].push(image);
         },
         onImageLoad(event) {
-            const percentage = Math.round(this.loadedImages / this.amount * 100);
-
             this.loadedImages += 1;
-            this.updatePercentageInLoader(percentage);
 
-            if (this.loadedImages === this.amount) {
+            if (this.loadedImages === this.totalImages) {
                 this.onAllImagesLoaded(event);
             }
-        },
-        updatePercentageInLoader(percentage) {
-            this.$refs.viewPercentage.innerHTML = percentage + '%';
         },
         onAllImagesLoaded(e) {
             this.imagesLoaded = true
@@ -394,7 +387,6 @@ export default {
             this.isMobile = !!('ontouchstart' in window || navigator.msMaxTouchPoints);
         },
         loadInitialImage(){
-            this.currentImageUrl = this.imageUrls[0] 
             this.setImage()
         },
         resizeWindow(){
@@ -483,50 +475,51 @@ export default {
             this.activeImageIndex = 1
             this.setImage(true)
         },
-        setImage(cached = false){
+        /**
+         * Reset to the first image.
+         */
+        setImage() {
             this.currentLeftPosition = this.currentTopPosition = 0
+            const firstImage = this.currentCanvasImages[0];
             
-            if (!cached) {
-                this.currentCanvasImage = new Image()
-                this.currentCanvasImage.crossOrigin='anonymous'
-                this.currentCanvasImage.src = this.currentImageUrl
+            let viewportElement = this.$refs.viewport.getBoundingClientRect()
+            this.canvas.width  = (this.isFullScreen) ? viewportElement.width : firstImage.width
+            this.canvas.height = (this.isFullScreen) ? viewportElement.height : firstImage.height
+            this.trackTransforms(this.ctx)
 
-                this.currentCanvasImage.onload = () => {
-                    let viewportElement = this.$refs.viewport.getBoundingClientRect()
-                    this.canvas.width  = (this.isFullScreen) ? viewportElement.width : this.currentCanvasImage.width
-                    this.canvas.height = (this.isFullScreen) ? viewportElement.height : this.currentCanvasImage.height
-                    this.trackTransforms(this.ctx)
-
-                    this.redraw()
-                }
-            } else {
-                this.currentCanvasImage = this.images[0]
-                let viewportElement = this.$refs.viewport.getBoundingClientRect()
-                this.canvas.width  = (this.isFullScreen) ? viewportElement.width : this.currentCanvasImage.width
-                this.canvas.height = (this.isFullScreen) ? viewportElement.height : this.currentCanvasImage.height
-                this.trackTransforms(this.ctx)
-
-                this.redraw()
-            }
+            this.redraw()
         },
+        /**
+         * Render current image onto the canvas.
+         */
         redraw() {
             try {
+                const firstImage = this.currentCanvasImages[0];
                 let p1 = this.ctx.transformedPoint(0,0);
                 let p2 = this.ctx.transformedPoint(this.canvas.width,this.canvas.height)
 
-                let hRatio = this.canvas.width / this.currentCanvasImage.width
-                let vRatio =  this.canvas.height / this.currentCanvasImage.height
+                let hRatio = this.canvas.width / firstImage.width
+                let vRatio =  this.canvas.height / firstImage.height
                 let ratio  = Math.min(hRatio, vRatio);
-                let centerShift_x = (this.canvas.width - this.currentCanvasImage.width*ratio )/2
-                let centerShift_y = (this.canvas.height - this.currentCanvasImage.height*ratio )/2
+                let centerShift_x = (this.canvas.width - firstImage.width*ratio )/2
+                let centerShift_y = (this.canvas.height - firstImage.height*ratio )/2
                 this.ctx.clearRect(p1.x,p1.y,p2.x-p1.x,p2.y-p1.y);
 
-                this.centerX = this.currentCanvasImage.width*ratio/2
-                this.centerY = this.currentCanvasImage.height*ratio/2
+                this.centerX = firstImage.width*ratio/2
+                this.centerY = firstImage.height*ratio/2
                 
                 //center image
-                this.ctx.drawImage(this.currentCanvasImage, this.currentLeftPosition, this.currentTopPosition, this.currentCanvasImage.width, this.currentCanvasImage.height,
-                            centerShift_x,centerShift_y,this.currentCanvasImage.width*ratio, this.currentCanvasImage.height*ratio);  
+                this.currentCanvasImages.forEach(image => {
+                    this.ctx.drawImage(image, 
+                        this.currentLeftPosition, 
+                        this.currentTopPosition, 
+                        firstImage.width, 
+                        firstImage.height,
+                        centerShift_x,
+                        centerShift_y,
+                        firstImage.width*ratio, 
+                        firstImage.height*ratio);  
+                })
 
                 this.addHotspots()
 
@@ -656,11 +649,10 @@ export default {
             
             this.update()
         },
+        /**
+         * Update image pointer based on active image index and redraw().
+         */
         update() {
-            const image = this.images[this.activeImageIndex - 1];
-
-            this.currentCanvasImage = image
-
             this.redraw()
         },
         stopMoving(evt){
@@ -816,6 +808,21 @@ export default {
         toggleFullScreen(){
             this.isFullScreen = !this.isFullScreen
         },
+    },
+
+    computed: {
+        currentImageUrls() {
+            return this.imageUrls.map(layerUrls => (layerUrls[ this.activeImageIndex-1 ]));
+        },
+        currentCanvasImages() {
+            return this.images.map(layerImages => (layerImages[ this.activeImageIndex-1 ]));
+        },
+        loadProgress() {
+            return Math.round(this.loadedImages / this.totalImages * 100) + '%';
+        },
+        totalImages() {
+            return this.amount * this.layers.length;
+        }
     }
 }
 </script>
